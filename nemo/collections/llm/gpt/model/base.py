@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Literal, Optional, Callable
+from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional
 
 import pytorch_lightning as L
 import torch
