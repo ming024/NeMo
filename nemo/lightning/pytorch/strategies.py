@@ -74,9 +74,9 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
         **kwargs,
     ) -> None:
         super().__init__(
-            parallel_devices,
-            cluster_environment,
-            checkpoint_io,
+            parallel_devices=parallel_devices,
+            cluster_environment=cluster_environment,
+            checkpoint_io=checkpoint_io,
             find_unused_parameters=find_unused_parameters,
             **kwargs,
         )
@@ -436,6 +436,11 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
             }
             module.load_state_dict(checkpoint_state_dict, strict=strict)
 
+
+        if self.megatron_parallel.pipeline.model_fn is not None:
+            self.megatron_parallel.pipeline.model_fn(self.megatron_parallel.pipeline)
+            self.precision_plugin.convert_module(self.megatron_parallel.pipeline)
+
     @property
     @override
     def checkpoint_io(self) -> CheckpointIO:
@@ -446,6 +451,10 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
             self._checkpoint_io.checkpoint_io = MegatronCheckpointIO()
 
         return self._checkpoint_io
+
+    @checkpoint_io.setter
+    def checkpoint_io(self, io: CheckpointIO) -> None:
+        self._checkpoint_io = io
 
     def _get_data_step(self, step_type: str) -> Optional[_ModuleStepFunction]:
         for fn_name in [f"{step_type}_data_step", "data_step"]:

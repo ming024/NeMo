@@ -46,8 +46,10 @@ class Mistral7BModel(GPTModel):
         config: Annotated[Optional[Mistral7BConfig], Config[Mistral7BConfig]] = None,
         optim: Optional[OptimizerModule] = None,
         tokenizer: Optional["TokenizerSpec"] = None,
+        model_transform: Callable = None,
     ):
-        super().__init__(config or Mistral7BConfig(), optim=optim, tokenizer=tokenizer)
+        super().__init__(config or Mistral7BConfig(), optim=optim, tokenizer=tokenizer,
+                         model_transform=model_transform)
 
 
 @io.model_importer(Mistral7BModel, "hf")

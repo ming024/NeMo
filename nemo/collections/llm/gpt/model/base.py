@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Literal, Optional
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Callable
 
 import pytorch_lightning as L
 import torch
@@ -70,12 +70,14 @@ class GPTModel(L.LightningModule, io.IOMixin, io.ConnectorMixin, fn.FNMixin):
         # TODO: Add transformer_layer_spec when we update mcore
         optim: Optional[OptimizerModule] = None,
         tokenizer: Optional["TokenizerSpec"] = None,
+        model_transform: Callable = None,
     ):
         super().__init__()
         self.config = config
         self.tokenizer = tokenizer
         self.optim = optim or MegatronOptimizerModule(config=OptimizerConfig(lr=1e-4, use_distributed_optimizer=True))
         self.optim.connect(self)  # This will bind the `configure_optimizers` method
+        self.model_transform = model_transform
 
     def configure_model(self) -> None:
         self.module = self.config.configure_model(self.tokenizer)
