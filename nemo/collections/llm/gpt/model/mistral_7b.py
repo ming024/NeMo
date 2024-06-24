@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional
 
+import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from typing_extensions import Annotated
@@ -46,9 +47,7 @@ class Mistral7BModel(GPTModel):
         optim: Optional[OptimizerModule] = None,
         tokenizer: Optional["TokenizerSpec"] = None,
     ):
-        _tokenizer = tokenizer or HFMistral7BImporter("mistralai/Mistral-7B-v0.1").tokenizer
-
-        super().__init__(config or Mistral7BConfig(), optim=optim, tokenizer=_tokenizer)
+        super().__init__(config or Mistral7BConfig(), optim=optim, tokenizer=tokenizer)
 
 
 @io.model_importer(Mistral7BModel, "hf")
@@ -71,6 +70,9 @@ class HFMistral7BImporter(io.ModelConnector["MistralForCausalLM", Mistral7BModel
         del trainer, target
 
         return output_path
+
+    def on_import_ckpt(self, model: pl.LightningModule):
+        model.tokenizer = self.tokenizer
 
     def convert_state(self, source, target):
         mapping = {
@@ -109,7 +111,7 @@ class HFMistral7BImporter(io.ModelConnector["MistralForCausalLM", Mistral7BModel
             hidden_size=source.hidden_size,
             ffn_hidden_size=source.intermediate_size,
             num_attention_heads=source.num_attention_heads,
-            max_position_embeddings=source.max_position_embeddings,
+            # max_position_embeddings=source.max_position_embeddings,
             init_method_std=source.initializer_range,
             layernorm_epsilon=source.rms_norm_eps,
             num_query_groups=source.num_key_value_heads,
@@ -117,6 +119,7 @@ class HFMistral7BImporter(io.ModelConnector["MistralForCausalLM", Mistral7BModel
             gated_linear_unit=True,
             make_vocab_size_divisible_by=make_vocab_size_divisible_by(source.vocab_size),
             window_size=[source.sliding_window, 0],
+            share_embeddings_and_output_weights=False,
         )
 
         return output
