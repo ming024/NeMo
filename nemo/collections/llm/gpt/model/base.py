@@ -47,7 +47,7 @@ class GPTConfig(TransformerConfig):
         try:
             import transformer_engine
             from megatron.core.models.gpt.gpt_layer_specs import get_gpt_layer_with_transformer_engine_spec
-            get_gpt_layer_spec = get_gpt_layer_with_transformer_engine_spe
+            get_gpt_layer_spec = get_gpt_layer_with_transformer_engine_spec
         except ImportError:
             from megatron.core.models.gpt.gpt_layer_specs import get_gpt_layer_local_spec
             get_gpt_layer_spec = get_gpt_layer_local_spec
