@@ -366,7 +366,7 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
                     callback.__class__ = MegatronProgressBar
                     break
 
-    def optimizer_sharded_state_dict(self):
+    def optimizer_sharded_state_dict(self, is_loading=False):
         """
         Sharded state dictionary for an MainParamsOptimizerWrapper.
         Used to save and load the optimizer state when training with distributed_checkpoint.
@@ -381,7 +381,7 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
 
         optimizer = self.lightning_module.optimizers(use_pl_optimizer=False)
 
-        return _strategy_lib.optimizer_sharded_state_dict(self.megatron_parallel, optimizer)
+        return _strategy_lib.optimizer_sharded_state_dict(self.megatron_parallel, optimizer, is_loading=is_loading)
 
     @override
     def save_checkpoint(
@@ -411,7 +411,7 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
 
         if self.ckpt_include_optimizer and self.trainer.state.fn == TrainerFn.FITTING:
             if self.lightning_module.optimizers(use_pl_optimizer=False):
-                sharded_state_dict["optimizer"] = [self.optimizer_sharded_state_dict()]
+                sharded_state_dict["optimizer"] = [self.optimizer_sharded_state_dict(is_loading=True)]
 
         checkpoint = self.checkpoint_io.load_checkpoint(checkpoint_path, sharded_state_dict=sharded_state_dict)
 
@@ -432,7 +432,10 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
                 checkpoint_state_dict = checkpoint['state_dict']
             # checkpoint_state_dict has "model." but module does not so we need to remove it when loading
             checkpoint_state_dict = {
-                key.replace('model.', ''): checkpoint_state_dict.pop(key) for key in list(checkpoint_state_dict.keys())
+                key.replace('model.', 'module.'): checkpoint_state_dict.pop(key) for key in list(checkpoint_state_dict.keys())
+            }
+            checkpoint_state_dict = {
+                key.replace('module.', 'module.module.'): checkpoint_state_dict.pop(key) for key in list(checkpoint_state_dict.keys())
             }
             module.load_state_dict(checkpoint_state_dict, strict=strict)
 
