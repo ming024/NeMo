@@ -21,6 +21,7 @@ from nemo.collections.llm.gpt.model import (
     gpt_data_step,
     gpt_forward_step,
 )
+from nemo.collections.llm import peft
 
 __all__ = [
     "MockDataModule",
