@@ -19,6 +19,8 @@ from nemo.collections.llm.gpt.model import (
     MaskedTokenLossReduction,
     Mistral7BConfig,
     Mistral7BModel,
+    MixtralConfig,
+    MixtralModel,
     gpt_data_step,
     gpt_forward_step,
 )
@@ -32,6 +34,8 @@ __all__ = [
     "MaskedTokenLossReduction",
     "Mistral7BConfig",
     "Mistral7BModel",
+    "MixtralConfig",
+    "MixtralModel",
     "PreTrainingDataModule",
     "FineTuningDataModule",
     "SquadDataModule",
