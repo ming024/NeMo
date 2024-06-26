@@ -100,6 +100,7 @@ except (ImportError, ModuleNotFoundError):
 
     HAVE_MEGATRON_CORE = False
     from typing import Any
+
     RetroConfig = Any
 
 try:

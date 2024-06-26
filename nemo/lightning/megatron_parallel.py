@@ -113,7 +113,9 @@ class MegatronParallel(nn.ModuleList):
         convert_module_fn: Optional[Callable[[nn.Module], nn.Module]] = None,
     ) -> None:
         try:
-            from apex.transformer.tensor_parallel.layers import set_defaults_if_not_set_tensor_model_parallel_attributes
+            from apex.transformer.tensor_parallel.layers import (
+                set_defaults_if_not_set_tensor_model_parallel_attributes,
+            )
         except ModuleNotFoundError:
             from nemo.lightning.apex_utils import set_defaults_if_not_set_tensor_model_parallel_attributes
         from megatron.core import parallel_state
@@ -150,8 +152,8 @@ class MegatronParallel(nn.ModuleList):
                     module.config,
                     ddp_config,
                     module,
-                    #data_parallel_group=parallel_state.get_data_parallel_group(with_context_parallel=True),
-                    #expert_data_parallel_group=parallel_state.get_data_modulo_expert_parallel_group(),
+                    # data_parallel_group=parallel_state.get_data_parallel_group(with_context_parallel=True),
+                    # expert_data_parallel_group=parallel_state.get_data_modulo_expert_parallel_group(),
                     # Turn off bucketing for model_chunk 2 onwards, since communication for these
                     # model chunks is overlapped with compute anyway.
                     disable_bucketing=(model_chunk_idx > 0),

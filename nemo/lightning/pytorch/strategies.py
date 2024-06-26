@@ -520,10 +520,12 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
                 checkpoint_state_dict = checkpoint['state_dict']
             # checkpoint_state_dict has "model." but module does not so we need to remove it when loading
             checkpoint_state_dict = {
-                key.replace('model.', 'module.'): checkpoint_state_dict.pop(key) for key in list(checkpoint_state_dict.keys())
+                key.replace('model.', 'module.'): checkpoint_state_dict.pop(key)
+                for key in list(checkpoint_state_dict.keys())
             }
             checkpoint_state_dict = {
-                key.replace('module.', 'module.module.'): checkpoint_state_dict.pop(key) for key in list(checkpoint_state_dict.keys())
+                key.replace('module.', 'module.module.'): checkpoint_state_dict.pop(key)
+                for key in list(checkpoint_state_dict.keys())
             }
 
             '''mcore_model = self.lightning_module.module

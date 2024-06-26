@@ -51,6 +51,7 @@ except (ImportError, ModuleNotFoundError):
 
     HAVE_TE_AND_MEGATRON_CORE = False
     from typing import Any
+
     RetroConfig = Any
 
 
@@ -124,13 +125,19 @@ class RETRODataset(Dataset):
 
 
 def build_train_valid_test_datasets(
-    cfg, retro_config: RetroConfig, train_valid_test_num_samples, seq_length, tokenizer,
+    cfg,
+    retro_config: RetroConfig,
+    train_valid_test_num_samples,
+    seq_length,
+    tokenizer,
 ):
 
     if HAVE_TE_AND_MEGATRON_CORE:
 
         # gpt dataset
-        train_ds, valid_ds, test_ds = gpt_train_valid_test_datasets_provider(cfg, train_valid_test_num_samples, tokenizer)
+        train_ds, valid_ds, test_ds = gpt_train_valid_test_datasets_provider(
+            cfg, train_valid_test_num_samples, tokenizer
+        )
 
         gpt_datasets = {
             "train": (train_ds, train_valid_test_num_samples[0]),
@@ -139,7 +146,10 @@ def build_train_valid_test_datasets(
         }
 
         retro_train_ds, retro_valid_ds, retro_test_ds = get_retro_datasets(
-            config=retro_config, gpt_datasets=gpt_datasets, sample_length=seq_length, eod_token_id=tokenizer.eos_id,
+            config=retro_config,
+            gpt_datasets=gpt_datasets,
+            sample_length=seq_length,
+            eod_token_id=tokenizer.eos_id,
         )
 
         train_ds = (

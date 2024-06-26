@@ -125,7 +125,6 @@ try:
     from transformer_engine.pytorch import module as te_module
     from nemo.collections.nlp.modules.common.hyena.hyena_spec import get_gpt_layer_with_te_and_hyena_spec
 
-
     HAVE_TE = True
 
 except (ImportError, ModuleNotFoundError):

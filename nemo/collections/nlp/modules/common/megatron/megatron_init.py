@@ -28,6 +28,7 @@ try:
 except (ImportError, ModuleNotFoundError):
 
     from nemo.lightning.apex_utils import setup_microbatch_calculator
+
     HAVE_APEX = False
 
 try:

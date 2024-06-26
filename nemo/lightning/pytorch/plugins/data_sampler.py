@@ -110,9 +110,7 @@ class MegatronDataSampler(DataSampler):
 
         self.prev_consumed_samples = consumed_samples
 
-        num_microbatch_calculator = (
-            _GLOBAL_NUM_MICROBATCHES_CALCULATOR  # noqa: SLF001
-        )
+        num_microbatch_calculator = _GLOBAL_NUM_MICROBATCHES_CALCULATOR  # noqa: SLF001
 
         num_microbatch_calculator.update(
             consumed_samples=consumed_samples,
@@ -152,9 +150,7 @@ class MegatronDataSampler(DataSampler):
         except ModuleNotFoundError:
             from nemo.lightning.apex_utils import _GLOBAL_NUM_MICROBATCHES_CALCULATOR
 
-        num_microbatch_calculator = (
-            _GLOBAL_NUM_MICROBATCHES_CALCULATOR  # noqa: SLF001
-        )
+        num_microbatch_calculator = _GLOBAL_NUM_MICROBATCHES_CALCULATOR  # noqa: SLF001
         current_global_batch_size = num_microbatch_calculator.current_global_batch_size
 
         return current_global_batch_size

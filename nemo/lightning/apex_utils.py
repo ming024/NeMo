@@ -17,9 +17,8 @@
 """Copied from https://github.com/NVIDIA/apex/blob/7b73b12361068a10b0f44844534613f252a5ea75/apex/transformer/pipeline_parallel/utils.py#L58 
    and https://github.com/NVIDIA/apex/blob/7b73b12361068a10b0f44844534613f252a5ea75/apex/transformer/microbatches.py
    and https://github.com/NVIDIA/apex/blob/7b73b12361068a10b0f44844534613f252a5ea75/apex/transformer/tensor_parallel/layers.py"""
-from abc import ABC
-from abc import abstractmethod
-from typing import Optional, List, Union, Tuple
+from abc import ABC, abstractmethod
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch.nn.parallel import DistributedDataParallel
@@ -41,8 +40,10 @@ _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {
     "partition_stride": 1,
 }
 
+
 def get_num_microbatches():
     return _GLOBAL_NUM_MICROBATCHES_CALCULATOR.get()
+
 
 def set_defaults_if_not_set_tensor_model_parallel_attributes(tensor: torch.Tensor) -> None:
     def maybe_set(attribute, value):
@@ -51,6 +52,7 @@ def set_defaults_if_not_set_tensor_model_parallel_attributes(tensor: torch.Tenso
 
     for attribute in _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS:
         maybe_set(attribute, _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS[attribute])
+
 
 def build_num_microbatches_calculator(
     rank: int,
@@ -61,9 +63,7 @@ def build_num_microbatches_calculator(
 ):
     # Constant num micro-batches.
     if rampup_batch_size is None:
-        num_microbatches_calculator = ConstantNumMicroBatches(
-            global_batch_size, micro_batch_size, data_parallel_size
-        )
+        num_microbatches_calculator = ConstantNumMicroBatches(global_batch_size, micro_batch_size, data_parallel_size)
         '''if rank == 0:
             _logger.info(
                 "setting number of micro-batches to constant {}".format(
@@ -118,14 +118,14 @@ class NumMicroBatchesCalculator(ABC):
     def update(self, consumed_samples, consistency_check):
         pass
 
+
 class ConstantNumMicroBatches(NumMicroBatchesCalculator):
     def __init__(self, global_batch_size, micro_batch_size, data_parallel_size):
         micro_batch_times_data_parallel = micro_batch_size * data_parallel_size
-        assert global_batch_size % micro_batch_times_data_parallel == 0, (
-            "global batch size ({}) is not divisible by micro batch size ({})"
-            " times data parallel size ({})".format(
-                global_batch_size, micro_batch_size, data_parallel_size
-            )
+        assert (
+            global_batch_size % micro_batch_times_data_parallel == 0
+        ), "global batch size ({}) is not divisible by micro batch size ({})" " times data parallel size ({})".format(
+            global_batch_size, micro_batch_size, data_parallel_size
         )
         self.num_micro_batches = global_batch_size // micro_batch_times_data_parallel
         assert self.num_micro_batches >= 1
@@ -135,6 +135,7 @@ class ConstantNumMicroBatches(NumMicroBatchesCalculator):
 
     def update(self, consumed_samples, consistency_check):
         pass
+
 
 def listify_model(model: Union[torch.nn.Module, List[torch.nn.Module]]) -> List[torch.nn.Module]:
     if isinstance(model, list):
@@ -153,33 +154,36 @@ def _ensure_var_is_not_initialized(var, name):
 
 
 def setup_microbatch_calculator(
-        rank: int,
-        rampup_batch_size: Optional[List[int]],
-        global_batch_size: int,
-        micro_batch_size: int,
-        data_parallel_size: int,
+    rank: int,
+    rampup_batch_size: Optional[List[int]],
+    global_batch_size: int,
+    micro_batch_size: int,
+    data_parallel_size: int,
 ) -> None:
     global _GLOBAL_NUM_MICROBATCHES_CALCULATOR
     _ensure_var_is_not_initialized(_GLOBAL_NUM_MICROBATCHES_CALCULATOR, 'num microbatches calculator')
 
     _GLOBAL_NUM_MICROBATCHES_CALCULATOR = build_num_microbatches_calculator(
-        rank, rampup_batch_size, global_batch_size, micro_batch_size, data_parallel_size)
+        rank, rampup_batch_size, global_batch_size, micro_batch_size, data_parallel_size
+    )
 
 
 def _reconfigure_microbatch_calculator(
-        rank: int,
-        rampup_batch_size: Optional[List[int]],
-        global_batch_size: int,
-        micro_batch_size: int,
-        data_parallel_size: int,
+    rank: int,
+    rampup_batch_size: Optional[List[int]],
+    global_batch_size: int,
+    micro_batch_size: int,
+    data_parallel_size: int,
 ) -> None:
     if torch.distributed.get_rank() == 0:
         import warnings
+
         warnings.warn("This function is only for unittest")
     global _GLOBAL_NUM_MICROBATCHES_CALCULATOR
 
     _GLOBAL_NUM_MICROBATCHES_CALCULATOR = build_num_microbatches_calculator(
-        rank, rampup_batch_size, global_batch_size, micro_batch_size, data_parallel_size)
+        rank, rampup_batch_size, global_batch_size, micro_batch_size, data_parallel_size
+    )
 
 
 def get_micro_batch_size():
@@ -200,10 +204,10 @@ def update_num_microbatches(consumed_samples, consistency_check=True):
 
 # note (mkozuki): Comment out in favor of `get_kth_microbatch`
 def _split_batch_into_microbatch(
-        batch: List[torch.Tensor],
-        *,
-        _micro_batch_size: Optional[int] = None,
-        _global_batch_size: Optional[int] = None,
+    batch: List[torch.Tensor],
+    *,
+    _micro_batch_size: Optional[int] = None,
+    _global_batch_size: Optional[int] = None,
 ) -> List[List[torch.Tensor]]:
     micro_batch_size = _micro_batch_size
     global_batch_size = _global_batch_size
@@ -212,7 +216,7 @@ def _split_batch_into_microbatch(
     if global_batch_size is None:
         global_batch_size = get_current_global_batch_size()
     for i in range(0, global_batch_size, micro_batch_size):
-        yield [x[i * micro_batch_size:(i + 1) * micro_batch_size] for x in batch]
+        yield [x[i * micro_batch_size : (i + 1) * micro_batch_size] for x in batch]
 
 
 # TODO(mkozuki): Support non-tensor local minibatches?
@@ -238,6 +242,7 @@ def get_kth_microbatch(batch: Optional[List[torch.Tensor]], k: int) -> List[torc
 
 def get_autoresume():
     return _GLOBAL_AUTORESUME
+
 
 def print_rank_0(message: str) -> None:
     """If distributed is initialized, print only on rank 0."""
@@ -299,9 +304,7 @@ def unwrap_model(model, module_instances=(DistributedDataParallel,)):
 #         sys.exit(0)
 
 
-def get_ltor_masks_and_position_ids(
-    data, eod_token, reset_position_ids, reset_attention_mask, eod_mask_loss
-):
+def get_ltor_masks_and_position_ids(data, eod_token, reset_position_ids, reset_attention_mask, eod_mask_loss):
     """Build masks and position id for left to right model."""
 
     # Extract batch size and sequence length.
@@ -312,9 +315,9 @@ def get_ltor_masks_and_position_ids(
         att_mask_batch = micro_batch_size
     else:
         att_mask_batch = 1
-    attention_mask = torch.tril(
-        torch.ones((att_mask_batch, seq_length, seq_length), device=data.device)
-    ).view(att_mask_batch, 1, seq_length, seq_length)
+    attention_mask = torch.tril(torch.ones((att_mask_batch, seq_length, seq_length), device=data.device)).view(
+        att_mask_batch, 1, seq_length, seq_length
+    )
 
     # Loss mask.
     loss_mask = torch.ones(data.size(), dtype=torch.float, device=data.device)
