@@ -23,13 +23,8 @@ from typing import List, Optional, Tuple, Union
 import torch
 from torch.nn.parallel import DistributedDataParallel
 
-## TODO: which of these do we need?
-_GLOBAL_ARGS = None
 _GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
-_GLOBAL_TOKENIZER = None
-_GLOBAL_TENSORBOARD_WRITER = None
 _GLOBAL_AUTORESUME = None
-_GLOBAL_TIMERS = None
 
 
 Shape = Union[List[int], torch.Size]
