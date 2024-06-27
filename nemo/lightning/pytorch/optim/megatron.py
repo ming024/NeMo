@@ -84,7 +84,6 @@ class MegatronOptimizerModule(OptimizerModule):
 
         from nemo.core.optim import McoreDistributedOptimizer
 
-        ## TODO: does this assume we are not using a distributed optimizer??
         class McoreOpt(McoreDistributedOptimizer):
             def sharded_state_dict(
                 self,
@@ -103,8 +102,7 @@ class MegatronOptimizerModule(OptimizerModule):
             lr_mult=self.lr_mult,
         )
 
-        return [McoreDistributedOptimizer(mcore_opt)]
-        # return [McoreOpt(mcore_opt)]
+        return [McoreOpt(mcore_opt)]
 
     def finalize_model_grads(self, *args, **kwargs):
         return finalize_model_grads(*args, **kwargs)

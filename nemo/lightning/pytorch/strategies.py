@@ -528,17 +528,8 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
                 checkpoint_state_dict = checkpoint['state_dict'][f'model_{index}']
             else:
                 checkpoint_state_dict = checkpoint['state_dict']
-            # checkpoint_state_dict has "model." but module does not so we need to remove it when loading
-            checkpoint_state_dict = {
-                key.replace('model.', 'module.'): checkpoint_state_dict.pop(key)
-                for key in list(checkpoint_state_dict.keys())
-            }
-            checkpoint_state_dict = {
-                key.replace('module.', 'module.module.'): checkpoint_state_dict.pop(key)
-                for key in list(checkpoint_state_dict.keys())
-            }
 
-            '''mcore_model = self.lightning_module.module
+            mcore_model = self.lightning_module.module
             current = self.model[0]
             n_nesting = 2
             while current != mcore_model:
@@ -560,7 +551,7 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
                 elif count > n_nesting:
                     to_remove = "module." * (count - n_nesting)
                     _state_dict[key[len(to_remove) :]] = value
-            checkpoint_state_dict = _state_dict'''
+            checkpoint_state_dict = _state_dict
 
             module.load_state_dict(checkpoint_state_dict, strict=strict)
 
