@@ -1,12 +1,15 @@
 import argparse
+
+from pytorch_lightning.loggers import TensorBoardLogger
+
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.lightning import AutoResume, MegatronStrategy, NeMoLogger
-from nemo.lightning.pytorch.callbacks import ModelCheckpoint
 from nemo.collections.llm.api import train
 from nemo.collections.llm.gpt.data import PreTrainingDataModule
 from nemo.collections.nlp.modules.common.tokenizer_utils import get_nmt_tokenizer
-from pytorch_lightning.loggers import TensorBoardLogger
+from nemo.lightning import AutoResume, MegatronStrategy, NeMoLogger
+from nemo.lightning.pytorch.callbacks import ModelCheckpoint
+
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train a small GPT model using NeMo 2.0')
@@ -17,13 +20,14 @@ def get_args():
 
     return parser.parse_args()
 
+
 if __name__ == '__main__':
 
     args = get_args()
 
     seq_length = 2048
 
-    tokenizer=get_nmt_tokenizer(
+    tokenizer = get_nmt_tokenizer(
         "megatron",
         "GPT2BPETokenizer",
         vocab_file=args.vocab_path,
@@ -54,7 +58,6 @@ if __name__ == '__main__':
         every_n_train_steps=5000,
     )
     callbacks = [checkpoint_callback]
-
 
     loggers = []
     tensorboard_logger = TensorBoardLogger(
