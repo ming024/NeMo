@@ -12,7 +12,7 @@ import pytorch_lightning as pl
 import torch
 import torch.distributed
 from lightning_fabric.plugins import CheckpointIO, ClusterEnvironment
-from lightning_fabric.utilities.optimizer import _optimizers_to_device
+from lightning_fabric.utilities.optimizer import _optimizer_to_device, _optimizers_to_device
 from megatron.core.distributed import DistributedDataParallelConfig
 from megatron.core.optimizer import OptimizerConfig
 from pytorch_lightning.accelerators import CPUAccelerator
@@ -515,6 +515,13 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
 
         return checkpoint
 
+    @override
+    def load_optimizer_state_dict(self, checkpoint: Mapping[str, Any]) -> None:
+        optimizer_states = checkpoint["optimizer"]
+        for optimizer, opt_state in zip(self.optimizers, optimizer_states):
+            optimizer.load_state_dict(opt_state)
+            _optimizer_to_device(optimizer, self.root_device)
+
     def remove_checkpoint(self, filepath: Union[str, Path]) -> None:
         if self.is_global_zero:
             shutil.rmtree(ckpt_to_dir(filepath))
@@ -530,8 +537,11 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
                 checkpoint_state_dict = checkpoint['state_dict']
 
             mcore_model = self.lightning_module.module
+            while hasattr(mcore_model, "module"):
+                mcore_model = mcore_model.module
+
             current = self.model[0]
-            n_nesting = 2
+            n_nesting = 0
             while current != mcore_model:
                 current = current.module
                 n_nesting += 1
