@@ -7,16 +7,19 @@ from nemo.collections import llm
 from nemo.collections.llm.api import train
 from nemo.collections.llm.gpt.data import PreTrainingDataModule
 from nemo.collections.nlp.modules.common.tokenizer_utils import get_nmt_tokenizer
-from nemo.lightning import AutoResume, MegatronStrategy, NeMoLogger
+from nemo.lightning import NeMoLogger
 from nemo.lightning.pytorch.callbacks import ModelCheckpoint
 
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train a small GPT model using NeMo 2.0')
     parser.add_argument('--devices', help="Number of devices to use for training")
+    parser.add_argument('--max-steps', help="Number of steps to train for")
+    parser.add_argument('--experiment-dir', help="directory to write results and checkpoints to")
     parser.add_argument('--data-path', help="Path to data file")
     parser.add_argument('--vocab-path', help="Path to vocab file")
     parser.add_argument('--merges-path', help="Path to merges file")
+    parser.add_argument('--index-mapping-dir', help="directory to write index mappings to")
 
     return parser.parse_args()
 
@@ -67,17 +70,17 @@ if __name__ == '__main__':
 
     trainer = nl.Trainer(
         devices=args.devices,
-        max_steps=10,
+        max_steps=args.max_steps,
         accelerator="gpu",
         strategy=strategy,
         logger=loggers,
         callbacks=callbacks,
-        log_every_n_steps=5,
+        log_every_n_steps=1,
         plugins=nl.MegatronMixedPrecision(precision="bf16-mixed", amp_O2=False),
     )
 
     nemo_logger = NeMoLogger(
-        name='experiment',
+        name=args.experiment_dir,
     )
 
     train(
