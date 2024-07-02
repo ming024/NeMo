@@ -4342,7 +4342,7 @@ jobs:
             --experiment-dir=examples/llm/gpt_pretrain_results \
             --vocab-path=/home/TestData/nlp/megatron_gpt/data/gpt/vocab.json \
             --merges-path=/home/TestData/nlp/megatron_gpt/data/gpt/merges.txt \
-            --data-path=home/TestData/nlp/megatron_gpt/data/gpt/simple_wiki_gpt_preproc_text_document,.5,/home/TestData/nlp/megatron_gpt/data/gpt/simple_wiki_gpt_preproc_text_document] \
+            --data-path=home/TestData/nlp/megatron_gpt/data/gpt/simple_wiki_gpt_preproc_text_document \
             --index-mapping-dir=examples/llm/gpt_index_mappings ## TODO: support
 
             python examples/nlp/language_modeling/megatron_gpt_pretraining.py \
@@ -4351,7 +4351,7 @@ jobs:
             --experiment-dir=examples/llm/gpt_pretrain_results \
             --vocab-path=/home/TestData/nlp/megatron_gpt/data/gpt/vocab.json \
             --merges-path=/home/TestData/nlp/megatron_gpt/data/gpt/merges.txt \
-            --data-path=home/TestData/nlp/megatron_gpt/data/gpt/simple_wiki_gpt_preproc_text_document,.5,/home/TestData/nlp/megatron_gpt/data/gpt/simple_wiki_gpt_preproc_text_document] \
+            --data-path=/home/TestData/nlp/megatron_gpt/data/gpt/simple_wiki_gpt_preproc_text_document \
             --index-mapping-dir=examples/llm/gpt_index_mappings ## TODO: support
 
             rm -rf examples/llm/gpt_pretrain_results
