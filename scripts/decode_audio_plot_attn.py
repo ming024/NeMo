@@ -32,7 +32,7 @@ def read_result_dir(result_path, file_prefix, codec_model):
             self_attn[j][j] = 0
 
         plot(self_attn, os.path.join(result_path, 'png', 'self_attn', f"self_attn_{i}.png"))
-        plot(cross_attn, os.path.join(result_path, 'png', 'cross_attn', f"cross_attn_{i}.png"))
+        plot(cross_attn, os.path.join(result_path, 'png', 'cross_attn', f"cross_attn_{i}.png"), "encoder", "decoder")
 
 def decode_savewav(codes, name, codec_model):
     sample_rate = 22050
@@ -46,9 +46,11 @@ def decode_savewav(codes, name, codec_model):
     sf.write(name, wav.detach().cpu().numpy(), sample_rate)
 
 
-def plot(attn_weights, name):
+def plot(attn_weights, name, xlabel="", ylabel=""):
     os.makedirs(os.path.dirname(name), exist_ok=True)
-    plt.imshow(attn_weights)
+    plt.imshow(attn_weights, origin='lower')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.savefig(name)
     plt.clf()
 
