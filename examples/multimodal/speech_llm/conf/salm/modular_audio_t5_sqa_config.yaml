@@ -228,19 +228,19 @@ model:
       # {'audio_filepath': 'audio1.wav', 'offset': 0.0, 'duration': 12.3, 'question': 'transcribe this audio', 'answer': 'I have a dream...'}
       # the 'answer' field can also be 'text', and a default 'question' field is added if missing in manigests, so as to work with ASR manifests
       input_cfg:
-        # - type: group
-        #   weight: 0.5
-        #   tags:
-        #     lang: en
-        #     s2st: True
-        #     task: sqa_text_instruct
-        #   input_cfg:
-        #     - type: lhotse_shar
-        #       shar_path: /workspace/data/s2s_shars/msmacro/
-        #       weight: 0.9
-        #     - type: lhotse_shar
-        #       shar_path: /workspace/data/s2s_shars/alpaca/
-        #       weight: 0.1
+        - type: group
+          weight: 0.5
+          tags:
+            lang: en
+            s2st: True
+            task: sqa_text_instruct
+          input_cfg:
+            - type: lhotse_shar
+              shar_path: /workspace/data/s2s_shars/msmacro/
+              weight: 0.9
+            - type: lhotse_shar
+              shar_path: /workspace/data/s2s_shars/alpaca/
+              weight: 0.1
         - type: group
           weight: 0.5
           tags:
