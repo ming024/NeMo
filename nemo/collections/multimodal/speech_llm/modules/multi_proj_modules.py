@@ -19,6 +19,8 @@ from pytorch_lightning.trainer.trainer import Trainer
 from pytorch_lightning.loops.fetchers import _DataFetcherWrapper
 
 from nemo.collections.nlp.models.machine_translation.megatron_nmt_model import MegatronNMTModel
+from nemo.collections.nlp.models.language_modeling.megatron_lm_encoder_decoder_model import MegatronLMEncoderDecoderModel
+from nemo.collections.nlp.models.language_modeling.megatron_t5_model import MegatronT5Model
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
     AdapterName,
     PromptEncoderAdapterConfig,
@@ -61,8 +63,7 @@ except (ImportError, ModuleNotFoundError):
     HAVE_MEGATRON_CORE = False
 
 
-
-class MegatronNMTMultiProjModel(MegatronNMTModel):
+class MegatronLMEncoderDecoderMultiProjModel(MegatronLMEncoderDecoderModel):
     """
     Megatron NMT training
     """
@@ -474,6 +475,12 @@ class MegatronNMTMultiProjModel(MegatronNMTModel):
             return output, id_func
 
         return fwd_output_only_func
+
+class MegatronNMTMultiProjModel(MegatronLMEncoderDecoderMultiProjModel, MegatronNMTModel):
+    pass
+
+class MegatronT5MultiProjModel(MegatronLMEncoderDecoderMultiProjModel, MegatronT5Model):
+    pass
 
 class MegatronTokenLevelEncoderDecoderMultiProjModule(MegatronTokenLevelEncoderDecoderModule):
     """Token-based (input/output is tokens) encoder-decoder model (e.g. T5 Language model.)"""
