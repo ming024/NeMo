@@ -223,6 +223,14 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
             speech_loss_mask = (tokens[:, :, 1:] != self.speech_pad_id)
             text_loss_mask = (tokens[:, :, 0:1] != text_pad_id)
             loss_mask = torch.cat([text_loss_mask, speech_loss_mask], 2)
+        if getattr(cut, "direct_s2st", False):
+            # Add 1 for eos token
+            token_list = [tc[:tcl+1] for tc, tcl in zip(target_codec, features_lens)]
+            tokens, _ = collate_and_pad(token_list)
+
+            speech_loss_mask = (tokens[:, :, 1:] != self.speech_pad_id)
+            text_loss_mask = (tokens[:, :, 0:1] != text_pad_id)
+            loss_mask = torch.cat([text_loss_mask, speech_loss_mask], 2)
         elif getattr(cut, "s2tt", False):
             # Add 1 for eos token
             token_list = [tt[:ttl+1] for tt, ttl in zip(target_texts, target_text_lengths)]

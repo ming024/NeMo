@@ -1730,6 +1730,7 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
 
         inputs_text = output['input_text']
         answers = output['answers']
+        target_texts = output['target_texts']
         preds = output['preds']
         if self.cfg.attention_map_mode == 'inference':
             self_attention_probs, cross_attention_probs = output['attention_probs']
@@ -1741,6 +1742,7 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
             'loss': loss,
             'preds': preds,  # 2d array
             'answers': answers,  # 2d array
+            'target_texts': target_texts,  # 2d array
             'inputs': inputs_text,  # [str]
             'speaker_contexts': speaker_contexts,  # 2d array
             'self_attention_probs': self_attention_probs,  # 2d array
@@ -1782,12 +1784,11 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
         )
 
         # Special ids to text function to handle stripping <eos> and special tokens with sentencepiece tokenizers.
-        answers = batch['target_texts']
-
         return {
             'input_text': batch['source_texts'],
             'preds': predicted_token_ids,
             'answers': batch['answers'],
+            'target_texts': batch['target_texts'],
             'attention_probs': attention_probs,
         }
 
@@ -1840,7 +1841,7 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
             torch.distributed.all_gather_object(
                 gathered_outputs,
                 [
-                    {'preds': x['preds'], 'answers': x['answers'], 'inputs': x['inputs'], 'metadata': x['metadata'], 'self_attention_probs': x['self_attention_probs'], 'cross_attention_probs': x['cross_attention_probs']}
+                    {'preds': x['preds'], 'answers': x['answers'], 'target_texts': x['target_texts'], 'inputs': x['inputs'], 'metadata': x['metadata'], 'self_attention_probs': x['self_attention_probs'], 'cross_attention_probs': x['cross_attention_probs']}
                     for x in output
                 ],
                 group=parallel_state.get_data_parallel_group(),
@@ -1861,8 +1862,8 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
             total_size = 0
             for rank in range(0, parallel_state.get_data_parallel_world_size()):
                 for batch in gathered_outputs[rank]:
-                    for pred, answer, input, self_attn, cross_attn, metadata in zip(
-                        batch['preds'], batch['answers'], batch['inputs'], batch['self_attention_probs'], batch['cross_attention_probs'], batch['metadata']
+                    for pred, answer, target_text, input, self_attn, cross_attn, metadata in zip(
+                        batch['preds'], batch['answers'], batch['target_texts'], batch['inputs'], batch['self_attention_probs'], batch['cross_attention_probs'], batch['metadata']
                     ):
                         key = input
                         total_size += 1
@@ -1872,7 +1873,8 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                             # Remove leading BOS
                             pred = pred[1:]
                             text_pred, speech_pred = self.parse_decoder_outputs(pred, self.tokenizer.eos_id, self.cfg.data.train_ds.speech_pad_id, self.cfg.data.train_ds.speech_eos_id)
-                            text_answer, speech_answer = self.parse_decoder_outputs(answer, self.tokenizer.eos_id, self.cfg.data.train_ds.speech_pad_id, self.cfg.data.train_ds.speech_eos_id)
+                            _, speech_answer = self.parse_decoder_outputs(answer, self.tokenizer.eos_id, self.cfg.data.train_ds.speech_pad_id, self.cfg.data.train_ds.speech_eos_id)
+                            text_answer = target_text[:, 0]
                             deduplicated_outputs['text_preds'].append(MegatronT5SFTModel.ids_to_text(text_pred.unsqueeze(0), self.tokenizer))
                             deduplicated_outputs['text_answers'].append(MegatronT5SFTModel.ids_to_text(text_answer.unsqueeze(0), self.tokenizer))
                             deduplicated_outputs['speech_preds'].append(speech_pred.cpu().numpy())
