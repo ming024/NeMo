@@ -54,7 +54,6 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
         pad_to_max_length: bool,
         max_seq_length: int,
         context_key: str = "context",
-        ali_score_key: str = "ali_score",
         default_context_key: str = "default_context",
         vocab_sizes: list[int] = [-1],
         decoder_reduction_factor: int = 1,
@@ -74,7 +73,6 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
 
         self.default_context = default_context
         self.context_key = context_key
-        self.ali_score_key = ali_score_key
         self.default_context_key = default_context_key
 
         if len(vocab_sizes) == 1 and vocab_sizes[0] <= 0:
@@ -96,15 +94,6 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
     def __getitem__(self, cuts) -> dict[str, torch.Tensor | list[str] | dict]:
         cuts = cuts.sort_by_duration()
 
-        # remove_ids = []
-        # # In case feature loading fails
-        # for i, cut in enumerate(cuts):
-        #     try:
-        #         cut.load_features()
-        #     except:
-        #         remove_ids.append(i)
-        #         continue
-        # cuts = [cut for i, cut in enumerate(cuts) if i not in remove_ids]
         logging.debug(f"Len: {len(cuts)}")
 
         metadata = []
@@ -160,8 +149,6 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
                 cut.context = getattr(cut, self.default_context_key)
             else:
                 cut.context = self.default_context
-            if hasattr(cut, self.ali_score_key):
-                cut.ali_score = getattr(cut, self.ali_score_key)
 
         text_pad_id = self.text_processor.pad_id
         text_unk_id = self.text_processor.unk_id
@@ -198,8 +185,7 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
         target_codec = get_3d_empty_tensor(len(cuts), max(features_lens).item()+1, text_pad_id, self.speech_pad_id)
         eos_tensor = torch.full((1, self.n_speech_codebooks*self.decoder_reduction_factor+1), self.speech_eos_id).to(torch.int)
         eos_tensor[:,0] = self.text_processor.unk_id
-        # Loop through cuts and build target_codec, label, and context tensors
-        speaker_context_list = []
+        # Loop through cuts and build target_codec
         for i, cut in enumerate(cuts):
             feat_i = cut.target_codes.load()
             target_codec[i,:feat_i.shape[0],0] = text_unk_id

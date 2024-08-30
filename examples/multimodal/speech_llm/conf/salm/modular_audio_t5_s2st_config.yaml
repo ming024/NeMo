@@ -253,7 +253,6 @@ model:
       # See audio_text_qa_dataset.py for details.
       concat_sampling_probabilities: null # When providing a list of datasets, this arg defines the sampling probabilities from each dataset when strategy='random'
       context_key: 'context'
-      ali_score_key: 'ali_score'
       answer_key: 'answer'
       add_eos: True
       # add_eos: False
@@ -316,7 +315,6 @@ model:
       min_seq_length: 1
       drop_last: False
       context_key: ${model.data.train_ds.context_key}
-      ali_score_key: ${model.data.train_ds.ali_score_key}
       answer_key: ${model.data.train_ds.answer_key}
       add_eos: ${model.data.train_ds.add_eos}
       add_sep: ${model.data.train_ds.add_sep}

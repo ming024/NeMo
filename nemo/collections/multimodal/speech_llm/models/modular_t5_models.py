@@ -1840,7 +1840,7 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
             torch.distributed.all_gather_object(
                 gathered_outputs,
                 [
-                    {'preds': x['preds'], 'answers': x['answers'], 'inputs': x['inputs'], 'speaker_contexts': x['speaker_contexts'], 'metadata': x['metadata'], 'self_attention_probs': x['self_attention_probs'], 'cross_attention_probs': x['cross_attention_probs']}
+                    {'preds': x['preds'], 'answers': x['answers'], 'inputs': x['inputs'], 'metadata': x['metadata'], 'self_attention_probs': x['self_attention_probs'], 'cross_attention_probs': x['cross_attention_probs']}
                     for x in output
                 ],
                 group=parallel_state.get_data_parallel_group(),
@@ -1854,7 +1854,6 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                 'speech_preds': [],
                 'speech_answers': [],
                 'inputs': [],
-                'speaker_contexts': [],
                 'self_attn': [],
                 'cross_attn': [],
                 'metadata': [],
@@ -1862,8 +1861,8 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
             total_size = 0
             for rank in range(0, parallel_state.get_data_parallel_world_size()):
                 for batch in gathered_outputs[rank]:
-                    for pred, answer, input, speaker_context, self_attn, cross_attn, metadata in zip(
-                        batch['preds'], batch['answers'], batch['inputs'], batch['speaker_contexts'], batch['self_attention_probs'], batch['cross_attention_probs'], batch['metadata']
+                    for pred, answer, input, self_attn, cross_attn, metadata in zip(
+                        batch['preds'], batch['answers'], batch['inputs'], batch['self_attention_probs'], batch['cross_attention_probs'], batch['metadata']
                     ):
                         key = input
                         total_size += 1
@@ -1879,11 +1878,9 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                             deduplicated_outputs['speech_preds'].append(speech_pred.cpu().numpy())
                             deduplicated_outputs['speech_answers'].append(speech_answer.cpu().numpy())
                             deduplicated_outputs['inputs'].append(input)
-                            # deduplicated_outputs['speaker_contexts'].append(speaker_context)
                             deduplicated_outputs['self_attn'].append(self_attn.cpu().numpy())
                             deduplicated_outputs['cross_attn'].append(cross_attn.cpu().numpy())
                             deduplicated_outputs['metadata'].append(metadata)
-                            # import pdb; pdb.set_trace()
             # Write predictions to file
             if self.global_rank == 0 and data_cfg.get("write_predictions_to_file", False):
                 logging.info(
@@ -1959,7 +1956,6 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
         inputs_path = os.path.join(output_dir, output_file_path_prefix + "_inputs.jsonl")
         for folder_name in ['speech_pred', 'speech_answer', 'speaker_contexts', 'self_attn', 'cross_attn']:
             os.makedirs(os.path.join(output_dir, 'npy', folder_name), exist_ok=True)
-        # speaker_contexts_path = os.path.join(output_dir, 'npy', 'speaker_contexts', output_file_path_prefix + "_speaker_context_{}.npy")
         self_attn_path = os.path.join(output_dir, 'npy', 'self_attn', output_file_path_prefix + "_self_attn_{}.npy")
         cross_attn_path = os.path.join(output_dir, 'npy', 'cross_attn', output_file_path_prefix + "_cross_attn_{}.npy")
         speech_pred_path = os.path.join(output_dir, 'npy', 'speech_pred', output_file_path_prefix + "_speech_pred_{}.npy")
