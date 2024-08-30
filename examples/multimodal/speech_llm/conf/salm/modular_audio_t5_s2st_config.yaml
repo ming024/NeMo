@@ -104,7 +104,6 @@ model:
   ffn_dropout: 0.0
 
   # use_am_tokenizer: True
-  override_vocab_size: 104960 # This should be equal to the vocab_sizes[0] + decoder_reduction_factor * sum(vocab_sizes[1:])
 
   # for MegatronNMTMultiProjModel and datasets
   vocab_sizes: [64000, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024]

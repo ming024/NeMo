@@ -742,11 +742,11 @@ class MegatronTokenLevelEncoderDecoderMultiProjModule(MegatronTokenLevelEncoderD
                     if self.fp16_cross_entropy:
                         assert token_logits.dtype == torch.half
                         tokens_loss = torch.stack([
-                            vocab_parallel_cross_entropy(token_logits[i], labels[:, :, i]-sum(self.proj_head_dims[:i]), label_smoothing) for i in range(self.n_proj_heads)
+                            vocab_parallel_cross_entropy(token_logits[i], labels[:, :, i], label_smoothing) for i in range(self.n_proj_heads)
                         ], axis=2)
                     else:
                         tokens_loss = torch.stack([
-                            vocab_parallel_cross_entropy(token_logits[i].float(), labels[:, :, i]-sum(self.proj_head_dims[:i]), label_smoothing) for i in range(self.n_proj_heads)
+                            vocab_parallel_cross_entropy(token_logits[i].float(), labels[:, :, i], label_smoothing) for i in range(self.n_proj_heads)
                         ], axis=2)
                     
                     # import pdb; pdb.set_trace()
@@ -762,12 +762,12 @@ class MegatronTokenLevelEncoderDecoderMultiProjModule(MegatronTokenLevelEncoderD
                 else:
                     # else return token logits (and hiddens if needed)
                     token_logits_blank = torch.full(
-                        (*token_logits[0].shape[:2], sum(self.proj_head_dims), len(token_logits)),
+                        (*token_logits[0].shape[:2], max(self.proj_head_dims), len(token_logits)),
                         -float('Inf'), 
                         device=token_logits[0].device
                     )
                     for i in range(len(token_logits)):
-                        token_logits_blank[:, :, sum(self.proj_head_dims[:i]):sum(self.proj_head_dims[:i+1]), i] = token_logits[i]
+                        token_logits_blank[:, :, :token_logits[i].shape[2], i] = token_logits[i]
                     # [s, b, h, heads] -> [b, s, h, heads]
                     token_logits = token_logits_blank.transpose(0, 1).contiguous()
                     if return_all_selfattention_probs or return_all_crossattention_probs:
@@ -801,8 +801,7 @@ class SumMultiEmbedding(Embedding):
         self,
         config: ModelParallelConfig,
         hidden_size,
-        orig_vocab_size,
-        vocab_size,
+        vocab_sizes,
         max_sequence_length,
         embedding_dropout_prob,
         init_method,
@@ -813,7 +812,7 @@ class SumMultiEmbedding(Embedding):
     ):
         super().__init__(config,
             hidden_size,
-            vocab_size,
+            sum(vocab_sizes),
             max_sequence_length,
             embedding_dropout_prob,
             init_method,
@@ -822,7 +821,9 @@ class SumMultiEmbedding(Embedding):
             position_embedding_type,
             transpose_batch_sequence,
         )
-        self.word_embeddings._parameters['weight'][orig_vocab_size:].data.zero_()
+        text_vocab_size = vocab_sizes[0]
+        self.vocab_sizes = vocab_sizes
+        self.word_embeddings._parameters['weight'][text_vocab_size:].data.zero_()
 
     # def add_tokentype_embeddings(self, num_tokentypes):
     #     """Add token-type embedding. This function is provided so we can add
@@ -839,6 +840,19 @@ class SumMultiEmbedding(Embedding):
     #     self.init_method(self.tokentype_embeddings.weight)
 
     def forward(self, input_ids, position_ids=None, token_type_ids=None):
-        # import pdb; pdb.set_trace()
+        input_ids = input_ids.clone()
+        input_ids[:, :, 1:] = self.speech_codec_id_to_token_id(input_ids[:, :, 1:])
+
         embeddings = super().forward(input_ids, position_ids, token_type_ids)
         return torch.sum(embeddings, axis=2)
+
+    def speech_codec_id_to_token_id(self, speech_codec):
+        """
+        Convert raw speech codec ids to tokens ids
+
+        Args:
+            speech_codec: a tensor of shape [batch_size, seq_len, len(self.vocab_sizes)-1] that contains raw speech codec which takes values from 0 to 1023 if NeMo codec is used
+        """    
+        for i in range(len(self.vocab_sizes)-1):
+            speech_codec[:, :, i] += sum(self.vocab_sizes[:i+1])
+        return speech_codec

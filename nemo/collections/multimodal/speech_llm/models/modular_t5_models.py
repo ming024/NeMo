@@ -39,7 +39,6 @@ from nemo.collections.multimodal.speech_llm.modules.perception_modules import (
     MultiAudioPerceptionModule,
 )
 from  nemo.collections.multimodal.speech_llm.modules.multi_proj_modules import SumMultiEmbedding
-from nemo.collections.multimodal.speech_llm.data.lhotse_dataset import token_id_to_speech_codec_id
 from nemo.collections.nlp.models.language_modeling.megatron_t5_adapter_model import MegatronT5LoraModel
 from nemo.collections.nlp.models.language_modeling.megatron_t5_sft_model import MegatronT5SFTModel
 from nemo.collections.nlp.models.nlp_model import NLPModel
@@ -1445,8 +1444,7 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
         self.frozen_model.enc_dec_model.decoder_embedding = SumMultiEmbedding(
             config=self.frozen_model.enc_dec_model.config,
             hidden_size=self.hidden_size,
-            orig_vocab_size=self.frozen_model.proj_head_dims[0],
-            vocab_size=self.padded_vocab_size,
+            vocab_sizes=self.frozen_model.proj_head_dims,
             max_sequence_length=self.frozen_model.cfg.max_position_embeddings,
             init_method=init_method_normal(0.2),
             num_tokentypes=0,
@@ -1480,7 +1478,6 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                 gpt_cfg.proj_head_loss_weights = proj_head_loss_weights
             decoder_reduction_factor = cfg.model.get('decoder_reduction_factor', 1)
             gpt_cfg.decoder_reduction_factor = decoder_reduction_factor
-            assert gpt_cfg.proj_head_dims[0] + sum(gpt_cfg.proj_head_dims[1:]) * decoder_reduction_factor == gpt_cfg.override_vocab_size, "vocab size should equal to the sum of projection head sizes"
             attention_map_mode = cfg.model.get('attention_map_mode', None)
             if attention_map_mode is not None:
                 gpt_cfg.attention_map_mode = attention_map_mode
@@ -1947,11 +1944,6 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
 
         # Get speech token ids
         n_speech_codebooks = self.frozen_model.n_proj_heads-1
-        speech_tokens = token_id_to_speech_codec_id(
-            speech_tokens.unsqueeze(0), 
-            n_speech_codebooks=n_speech_codebooks, 
-            codebook_sizes=self.frozen_model.proj_head_dims
-        ).squeeze(0)
         
         # Remove padded parts of speech tokens
         speech_eos_pos = (torch.sum(speech_tokens == speech_eos_id, axis=1) == n_speech_codebooks)
