@@ -238,7 +238,7 @@ model:
         weight: 1.0
         tags:
           lang: en
-          s2st: True
+          s2s: True
       global_batch_size: ${model.global_batch_size}
       micro_batch_size: ${model.micro_batch_size}
       shuffle: True
@@ -298,14 +298,14 @@ model:
           weight: 1.0
           tags:
             lang: en
-            s2st: True
+            s2s: True
           input_cfg:
             - type: lhotse_shar
               shar_path: /workspace/data/s2s_shars/es_validation/
               weight: 1.0
               tags:
                 lang: en
-                s2st: True
+                s2s: True
       global_batch_size: ${model.global_batch_size}
       micro_batch_size: ${model.micro_batch_size}
       shuffle: False

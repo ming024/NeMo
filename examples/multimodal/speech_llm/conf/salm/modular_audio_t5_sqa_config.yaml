@@ -232,7 +232,7 @@ model:
           weight: 0.5
           tags:
             lang: en
-            s2st: True
+            s2s: True
             task: sqa_text_instruct
           input_cfg:
             - type: lhotse_shar
@@ -245,7 +245,7 @@ model:
           weight: 0.5
           tags:
             lang: en
-            s2st: True
+            s2s: True
             task: sqa_speech_instruct
           input_cfg:
             - type: lhotse_shar
@@ -314,7 +314,7 @@ model:
           weight: 0.5
           tags:
             lang: en
-            s2st: True
+            s2s: True
             task: sqa_text_instruct
           input_cfg:
             - type: lhotse_shar
@@ -327,7 +327,7 @@ model:
           weight: 0.5
           tags:
             lang: en
-            s2st: True
+            s2s: True
             task: sqa_speech_instruct
           input_cfg:
             - type: lhotse_shar
