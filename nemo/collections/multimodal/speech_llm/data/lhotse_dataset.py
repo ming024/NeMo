@@ -234,7 +234,8 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
             loss_mask = torch.cat([text_loss_mask, speech_loss_mask], 2)
         if getattr(cut, "direct_s2s", False):
             # Add 1 for eos token
-            token_list = [tc[:tcl+1] for tc, tcl in zip(target_codec, features_lens)]
+            # tt[0] is the bos token
+            token_list = [torch.concat([tt[:1], tc[:tcl+1]], 0) for tt, tc, tcl in zip(target_texts, target_codec, features_lens)]
             tokens, _ = collate_and_pad(token_list)
 
             speech_loss_mask = (tokens[:, :, 1:] != self.speech_pad_id)
