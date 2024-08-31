@@ -277,7 +277,7 @@ model:
       separate_prompt_and_response_with_newline: False
       truncation_field: "context" # Options: ['context', 'answer']
       index_mapping_dir: null # Path to a directory to write index mapping files.
-      prompt_template: "Q: {context}\nA: {answer}" # fstring to use for assistant prompt. Example: "Q: {input}\nA: {output}"
+      prompt_template: "{context}\n{answer}" # fstring to use for assistant prompt. Example: "Q: {input}\nA: {output}"
       speech_pad_id: 1001
       speech_unk_id: 1002
       speech_bos_id: 1003
@@ -285,7 +285,7 @@ model:
       filter_by_source_target_text_ratio: False # If the length of the source and target texts differ too much, the instance will be discarded
       source_target_text_ratio_limit: -1
       # ASR configs
-      sample_rate: 16000 #${model.audio_encoder.preprocessor.sample_rate}
+      sample_rate: 22050 #${model.audio_encoder.preprocessor.sample_rate}
       max_duration: 24 # it is set for LibriSpeech, you may need to update it for your dataset
       min_duration: 0.1
       # tarred datasets
@@ -364,7 +364,7 @@ model:
       filter_by_source_target_text_ratio: False # If the length of the source and target texts differ too much, the instance will be discarded
       source_target_text_ratio_limit: 4.0
       # ASR configs
-      sample_rate: 16000 #${model.audio_encoder.preprocessor.sample_rate}
+      sample_rate: 22050 #${model.audio_encoder.preprocessor.sample_rate}
 
       log_every_n_steps: 1
       metric:

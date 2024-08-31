@@ -1,4 +1,5 @@
 import torch.utils.data
+import torchaudio
 import random
 import logging
 from lhotse import CutSet
@@ -63,6 +64,7 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
         speech_eos_id: int = 1004,
         filter_by_source_target_text_ratio: bool = False,
         source_target_text_ratio_limit: float = 1.0,
+        sample_rate: int = 22050,
     ):
         super().__init__()
         self.text_processor = text_processor
@@ -86,6 +88,7 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
         self.speech_eos_id = speech_eos_id
         self.filter_by_source_target_text_ratio = filter_by_source_target_text_ratio
         self.source_target_text_ratio_limit = source_target_text_ratio_limit
+        self.sample_rate = sample_rate
 
         # To be consistent with SALM text processor
         self.text_processor.add_sep = False
@@ -135,8 +138,14 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
         
         cuts = [c for i, c in enumerate(cuts) if i not in remove_ids]
         cuts = CutSet(cuts)
+        cuts_sample_rates = [c.recording.sampling_rate for c in cuts]
 
         audio, audio_lens, cuts = self.load_audio(cuts)
+        # Resample audio waveform here since cuts.resample causes core dump sometimes
+        audio = torch.stack([
+            torchaudio.functional.resample(a, orig_sample_rate, self.sample_rate) for a, orig_sample_rate in zip(audio, cuts_sample_rates)
+        ])
+        audio_lens = (audio_lens * (self.sample_rate / torch.IntTensor(cuts_sample_rates).to(audio_lens.device))).int()
 
         audio_ratio = []
         for id, cut in enumerate(cuts):
