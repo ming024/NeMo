@@ -1937,9 +1937,14 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
     
     def parse_decoder_outputs(self, decoder_output, text_separator, speech_pad_id=1001, speech_eos_id=1004):
         # Split text and speech part based on the position of the first separator token
-        first_sep_pos = torch.argmax((decoder_output[:, 0] == text_separator).long())
-        text_tokens = decoder_output[:first_sep_pos, 0]
-        speech_tokens = decoder_output[first_sep_pos+1:, 1:]
+        sep_pos = (decoder_output[:, 0] == text_separator).long()
+        if torch.any(sep_pos):
+            first_sep_pos = torch.argmax(sep_pos)
+            text_tokens = decoder_output[:first_sep_pos, 0]
+            speech_tokens = decoder_output[first_sep_pos+1:, 1:]
+        else:
+            text_tokens = decoder_output[:, 0]
+            speech_tokens = decoder_output[:, 1:]
 
         # Get speech token ids
         n_speech_codebooks = self.frozen_model.n_proj_heads-1
