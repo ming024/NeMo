@@ -137,15 +137,15 @@ class LhotseAudioQuestionAnswerDataset(torch.utils.data.Dataset):
             target_text_lengths.append(target_text_length)
         
         cuts = [c for i, c in enumerate(cuts) if i not in remove_ids]
-        cuts = CutSet(cuts)
         cuts_sample_rates = [c.recording.sampling_rate for c in cuts]
 
-        audio, audio_lens, cuts = self.load_audio(cuts)
+        # AudioSamples does not work if the audio files in the CutSet has different sampling rates
+        audio, audio_lens, cuts = zip(*[self.load_audio(CutSet([c])) for c in cuts])
         # Resample audio waveform here since cuts.resample causes core dump sometimes
-        audio = torch.stack([
-            torchaudio.functional.resample(a, orig_sample_rate, self.sample_rate) for a, orig_sample_rate in zip(audio, cuts_sample_rates)
-        ])
-        audio_lens = (audio_lens * (self.sample_rate / torch.IntTensor(cuts_sample_rates).to(audio_lens.device))).int()
+        audio = [torchaudio.functional.resample(a, orig_sample_rate, self.sample_rate).squeeze(0) for a, orig_sample_rate in zip(audio, cuts_sample_rates)]
+        audio_lens = (torch.IntTensor(audio_lens) * (self.sample_rate / torch.IntTensor(cuts_sample_rates))).int()
+        audio = collate_vectors(audio, max_length=max(audio_lens), padding_value=0.)
+        cuts = CutSet([c[0] for c in cuts])
 
         audio_ratio = []
         for id, cut in enumerate(cuts):
