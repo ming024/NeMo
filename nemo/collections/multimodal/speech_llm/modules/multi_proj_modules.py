@@ -126,7 +126,7 @@ class MegatronLMEncoderDecoderMultiProjModel(MegatronLMEncoderDecoderModel):
             add_encoder=add_encoder,
             add_decoder=add_decoder,
             share_token_embeddings=self.cfg.get('share_token_embeddings', True),
-            share_decoder_tokens_head_embeddings=True,
+            share_decoder_tokens_head_embeddings=self.cfg.get('share_decoder_tokens_head_embedding', True),
             tokens_head_bias=self.cfg.get('tokens_head_bias', True),
             hiddens_cfg=self.cfg.get('hiddens', None),
             n_proj_heads=self.n_proj_heads,

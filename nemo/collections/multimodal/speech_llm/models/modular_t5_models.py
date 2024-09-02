@@ -1386,6 +1386,8 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
             t5_cfg.proj_head_loss_weights = cfg.proj_head_loss_weights
         if 'decoder_reduction_factor' in cfg:
             t5_cfg.decoder_reduction_factor = cfg.decoder_reduction_factor
+        if 'share_decoder_tokens_head_embedding' in cfg:
+            t5_cfg.share_decoder_tokens_head_embedding = cfg.share_decoder_tokens_head_embedding
         self.frozen_model = MegatronT5Model.restore_from(
             cfg.get('language_model_path'),
             trainer=trainer,
@@ -1481,6 +1483,9 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
             attention_map_mode = cfg.model.get('attention_map_mode', None)
             if attention_map_mode is not None:
                 gpt_cfg.attention_map_mode = attention_map_mode
+            share_decoder_tokens_head_embedding = cfg.model.get('share_decoder_tokens_head_embedding', None)
+            if share_decoder_tokens_head_embedding is not None:
+                gpt_cfg.share_decoder_tokens_head_embedding = share_decoder_tokens_head_embedding
             sampling = cfg.model.get('sampling', None)
             if sampling is not None:
                 gpt_cfg.sampling = sampling

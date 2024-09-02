@@ -216,6 +216,7 @@ model:
     temperature: 0.85
   
   legacy_tokenizer: True
+  share_decoder_tokens_head_embedding: False
 
   data:
     train_ds:
