@@ -1902,80 +1902,80 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                     deduplicated_outputs, f"{data_cfg.output_file_path_prefix}_{filename_log_key}", output_dir
                 )
 
-            # Compute metric score
-            for metric_name, metric_fn, averaged_metric in zip(metric_names, metrics, averaged_metrics):
-                if metric_name != 'loss':
-                    metric_log_key = self._determine_log_key(data_cfg, dataloader_idx, metric_name, mode)
-                    labels = deduplicated_outputs['text_answers']
+                # Compute metric score
+                for metric_name, metric_fn, averaged_metric in zip(metric_names, metrics, averaged_metrics):
+                    if metric_name != 'loss':
+                        metric_log_key = self._determine_log_key(data_cfg, dataloader_idx, metric_name, mode)
+                        labels = deduplicated_outputs['text_answers']
 
-                    if "asr" in metric_name:
-                        if 'asr_model' not in self.additional_models:
-                            import nemo.collections.asr as nemo_asr
-                            asr_model = nemo_asr.models.EncDecHybridRNNTCTCBPEModel.from_pretrained("stt_multilingual_fastconformer_hybrid_large_pc_blend_eu").to(self.device)
-                            asr_model.encoder.disable_torch_distributed = True # For multi-gpu training validation
-                            asr_model.eval()
-                            self.additional_models['asr_model'] = asr_model
-                            logging.info(f"Loaded ASR Model: {asr_model}")
+                        if "asr" in metric_name:
+                            if 'asr_model' not in self.additional_models:
+                                import nemo.collections.asr as nemo_asr
+                                asr_model = nemo_asr.models.EncDecHybridRNNTCTCBPEModel.from_pretrained("stt_multilingual_fastconformer_hybrid_large_pc_blend_eu").to(self.device)
+                                asr_model.encoder.disable_torch_distributed = True # For multi-gpu training validation
+                                asr_model.eval()
+                                self.additional_models['asr_model'] = asr_model
+                                logging.info(f"Loaded ASR Model: {asr_model}")
+                            else:
+                                asr_model = self.additional_models['asr_model']
+                            
+                            if 'codec_model' not in self.additional_models:
+                                from nemo.collections.tts.models import AudioCodecModel
+                                codec_model = AudioCodecModel.restore_from(self.cfg.codec_model_path)
+                                codec_model.to(self.device)
+                                codec_model.eval()
+                                self.additional_models['codec_model'] = codec_model
+                                logging.info(f"Loaded Codec Model: {codec_model}")
+                            else:
+                                codec_model = self.additional_models['codec_model']
+                            
+                            logging.info(f"Decoding and saving audio")
+                            pred_wavs = self.decode_and_save_wavs(codec_model, pred_npy_paths, os.path.join(output_dir, "wav", "pred"))
+                            answer_wavs = self.decode_and_save_wavs(codec_model, answer_npy_paths, os.path.join(output_dir, "wav", "answer"))
+                            logging.info(f"Running ASR on speech preds")
+                            speech_preds_transcribed = [asr_model.transcribe(wav)[0][0] for wav in pred_wavs]
+                            deduplicated_outputs['speech_preds_transcribed'] = speech_preds_transcribed
+
+                        # sacrebleu.corpus_bleu is commonly used which does not share
+                        # the same interface as other metrics. We handle it separately.
+                        text_preds = deduplicated_outputs['text_preds']
+                        if "asr-" in metric_name:
+                            text_preds = deduplicated_outputs['speech_preds_transcribed']
+
+                        text_metric_name = metric_name.replace("asr-", "")
+                        if text_metric_name == 'bleu':
+                            metric_result = torch.Tensor(
+                                [sacrebleu.corpus_bleu(text_preds, [labels]).score]
+                            ).to(self.device)
+                        elif metric_name == 'asr-wer':
+                            for pred, label in zip(deduplicated_outputs['speech_preds_transcribed'], deduplicated_outputs['text_preds']):
+                                _ = metric_fn(pred, label)
+
+                            metric_result = metric_fn.compute()
+                        elif metric_name == 'mos':
+                            if 'squim_mos_model' not in self.additional_models:
+                                from torchaudio.pipelines import SQUIM_SUBJECTIVE
+                                squim_mos_model = SQUIM_SUBJECTIVE.get_model().to(self.device)
+                                self.additional_models['squim_mos_model'] = squim_mos_model
+                            else:
+                                squim_mos_model = self.additional_models['squim_mos_model']
+
+                            import torchaudio
+                            pred_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in pred_wavs]
+                            answer_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in answer_wavs]
+                            squim_mos_scores = [squim_mos_model(pred_wav, answer_wav) for pred_wav, answer_wav in zip(pred_wavs, answer_wavs)]
+                            metric_result = sum(squim_mos_scores) / len(squim_mos_scores)
                         else:
-                            asr_model = self.additional_models['asr_model']
-                        
-                        if 'codec_model' not in self.additional_models:
-                            from nemo.collections.tts.models import AudioCodecModel
-                            codec_model = AudioCodecModel.restore_from(self.cfg.codec_model_path)
-                            codec_model.to(self.device)
-                            codec_model.eval()
-                            self.additional_models['codec_model'] = codec_model
-                            logging.info(f"Loaded Codec Model: {codec_model}")
-                        else:
-                            codec_model = self.additional_models['codec_model']
-                        
-                        logging.info(f"Decoding and saving audio")
-                        pred_wavs = self.decode_and_save_wavs(codec_model, pred_npy_paths, os.path.join(output_dir, "wav", "pred"))
-                        answer_wavs = self.decode_and_save_wavs(codec_model, answer_npy_paths, os.path.join(output_dir, "wav", "answer"))
-                        logging.info(f"Running ASR on speech preds")
-                        speech_preds_transcribed = [asr_model.transcribe(wav)[0][0] for wav in pred_wavs]
-                        deduplicated_outputs['speech_preds_transcribed'] = speech_preds_transcribed
+                            for pred, label in zip(deduplicated_outputs['preds'], labels):
+                                _ = metric_fn(pred, label)
 
-                    # sacrebleu.corpus_bleu is commonly used which does not share
-                    # the same interface as other metrics. We handle it separately.
-                    text_preds = deduplicated_outputs['text_preds']
-                    if "asr-" in metric_name:
-                        text_preds = deduplicated_outputs['speech_preds_transcribed']
+                            metric_result = metric_fn.compute()
+                            metric_fn.reset()
+                            
+                        self.log(metric_log_key, metric_result.item(), sync_dist=True)
+                        logging.info(f"{mode} {metric_name}: {metric_result.item()}")
 
-                    text_metric_name = metric_name.replace("asr-", "")
-                    if text_metric_name == 'bleu':
-                        metric_result = torch.Tensor(
-                            [sacrebleu.corpus_bleu(text_preds, [labels]).score]
-                        ).to(self.device)
-                    elif metric_name == 'asr-wer':
-                        for pred, label in zip(deduplicated_outputs['speech_preds_transcribed'], deduplicated_outputs['text_preds']):
-                            _ = metric_fn(pred, label)
-
-                        metric_result = metric_fn.compute()
-                    elif metric_name == 'mos':
-                        if 'squim_mos_model' not in self.additional_models:
-                            from torchaudio.pipelines import SQUIM_SUBJECTIVE
-                            squim_mos_model = SQUIM_SUBJECTIVE.get_model().to(self.device)
-                            self.additional_models['squim_mos_model'] = squim_mos_model
-                        else:
-                            squim_mos_model = self.additional_models['squim_mos_model']
-
-                        import torchaudio
-                        pred_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in pred_wavs]
-                        answer_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in answer_wavs]
-                        squim_mos_scores = [squim_mos_model(pred_wav, answer_wav) for pred_wav, answer_wav in zip(pred_wavs, answer_wavs)]
-                        metric_result = sum(squim_mos_scores) / len(squim_mos_scores)
-                    else:
-                        for pred, label in zip(deduplicated_outputs['preds'], labels):
-                            _ = metric_fn(pred, label)
-
-                        metric_result = metric_fn.compute()
-                        metric_fn.reset()
-                        
-                    self.log(metric_log_key, metric_result.item(), sync_dist=True)
-                    logging.info(f"{mode} {metric_name}: {metric_result.item()}")
-
-                    averaged_metric.append(metric_result)
+                        averaged_metric.append(metric_result)
 
             torch.distributed.barrier(group=parallel_state.get_data_parallel_group())
             outputs[dataloader_idx].clear()  # free memory
