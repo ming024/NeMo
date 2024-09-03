@@ -1929,12 +1929,13 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                             else:
                                 codec_model = self.additional_models['codec_model']
                             
-                            logging.info(f"Decoding and saving audio")
-                            pred_wavs = self.decode_and_save_wavs(codec_model, pred_npy_paths, os.path.join(output_dir, "wav", "pred"))
-                            answer_wavs = self.decode_and_save_wavs(codec_model, answer_npy_paths, os.path.join(output_dir, "wav", "answer"))
-                            logging.info(f"Running ASR on speech preds")
-                            speech_preds_transcribed = [asr_model.transcribe(wav)[0][0] for wav in pred_wavs]
-                            deduplicated_outputs['speech_preds_transcribed'] = speech_preds_transcribed
+                            with torch.no_grad():
+                                logging.info(f"Decoding and saving audio")
+                                pred_wavs = self.decode_and_save_wavs(codec_model, pred_npy_paths, os.path.join(output_dir, "wav", "pred"))
+                                answer_wavs = self.decode_and_save_wavs(codec_model, answer_npy_paths, os.path.join(output_dir, "wav", "answer"))
+                                logging.info(f"Running ASR on speech preds")
+                                speech_preds_transcribed = [asr_model.transcribe(wav)[0][0] for wav in pred_wavs]
+                                deduplicated_outputs['speech_preds_transcribed'] = speech_preds_transcribed
 
                         # sacrebleu.corpus_bleu is commonly used which does not share
                         # the same interface as other metrics. We handle it separately.
@@ -1961,10 +1962,11 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                                 squim_mos_model = self.additional_models['squim_mos_model']
 
                             import torchaudio
-                            pred_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in pred_wavs]
-                            answer_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in answer_wavs]
-                            squim_mos_scores = [squim_mos_model(pred_wav, answer_wav) for pred_wav, answer_wav in zip(pred_wavs, answer_wavs)]
-                            metric_result = sum(squim_mos_scores) / len(squim_mos_scores)
+                            with torch.no_grad():
+                                pred_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in pred_wavs]
+                                answer_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in answer_wavs]
+                                squim_mos_scores = [squim_mos_model(pred_wav, answer_wav) for pred_wav, answer_wav in zip(pred_wavs, answer_wavs)]
+                                metric_result = sum(squim_mos_scores) / len(squim_mos_scores)
                         else:
                             for pred, label in zip(deduplicated_outputs['preds'], labels):
                                 _ = metric_fn(pred, label)
