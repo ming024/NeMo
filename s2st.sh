@@ -4,6 +4,7 @@ PYTHONPATH=./ CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 NEMO_ENABLE_COLORING=1 p
     name=debug \
     model.language_model_path=/workspace/model/megatronnmt_any_en_500m.nemo \
     model.salm_model_path="/workspace/model/megatron_audio_gpt_peft_tuning--validation_bleu\=53.280-step\=87504-epoch\=4.ckpt" \
+    model.codec_model_path="/workspace/model/SpeechCodec_2402.nemo" \
     model.pretrained_audio_model=/workspace/model/stt_multilingual_fastconformer_hybrid_large_pc_blend_eu.nemo \
     exp_manager.exp_dir=/workspace/Experiments/s2st_mini/ \
     trainer.devices=1 \

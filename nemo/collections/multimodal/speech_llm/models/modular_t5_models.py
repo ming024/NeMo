@@ -99,16 +99,11 @@ class ModularizedAudioT5Model(MegatronT5LoraModel):
     def __init__(self, cfg: DictConfig, trainer: Trainer):
         self.cfg = cfg
         super().__init__(cfg, trainer)
-        self.val_metric, self.val_metric_name = self.setup_metric(self.cfg.data.validation_ds)
-        self.val_metric = torch.nn.ModuleList(self.val_metric)
+        self.val_metrics, self.val_metric_names = self.setup_metric(self.cfg.data.validation_ds)
+        self.val_metrics = torch.nn.ModuleList(self.val_metrics)
         if hasattr(self.cfg.data, "test_ds"):
-            self.test_metric, self.test_metric_name = self.setup_metric(self.cfg.data.test_ds)
-            self.test_metric = torch.nn.ModuleList(self.test_metric)
-        # Used other keys from metadata to calulate metrics
-        if hasattr(self.cfg.data, "test_ds") and hasattr(self.cfg.data.test_ds, "metric"):
-            self.test_metric_label_key = self.cfg.data.test_ds.metric.get('label_key', 'labels')
-        if hasattr(self.cfg.data, "validation_ds") and hasattr(self.cfg.data.validation_ds, "metric"):
-            self.val_metric_label_key = self.cfg.data.validation_ds.metric.get('label_key', 'labels')
+            self.test_metrics, self.test_metric_names = self.setup_metric(self.cfg.data.test_ds)
+            self.test_metrics = torch.nn.ModuleList(self.test_metrics)
         self.setup_perception_modules(cfg)
         self.setup_optimizer_param_groups()
         # self.configure_optimizers()
@@ -527,6 +522,7 @@ class ModularizedAudioT5Model(MegatronT5LoraModel):
             gpt_cfg.answer_only_loss = cfg.model.answer_only_loss
             gpt_cfg.language_model_path = cfg.model.language_model_path
             gpt_cfg.salm_model_path = cfg.model.get("salm_model_path", None)
+            gpt_cfg.codec_model_path = cfg.model.get("codec_model_path", None)
             gpt_cfg.resume_from_checkpoint = cfg.model.resume_from_checkpoint
             gpt_cfg.save_nemo_on_validation_end = cfg.model.save_nemo_on_validation_end
             gpt_cfg.gradient_as_bucket_view = cfg.model.gradient_as_bucket_view
@@ -759,50 +755,54 @@ class ModularizedAudioT5Model(MegatronT5LoraModel):
 
     def setup_metric(self, data_cfg):
         metric_name = "exact_string_match"
-        if not hasattr(data_cfg, "metric"):
-            metric = MetricStringToTorchMetric["exact_string_match"]
+        if not hasattr(data_cfg, "metrics"):
+            metrics = [(MetricStringToTorchMetric["exact_string_match"], "exact_string_match")]
         else:
-            if not hasattr(data_cfg.metric, "name"):
-                raise ValueError("Metric name is not provided in the metric config.")
-            if data_cfg.metric.name == "loss":
-                return None, "loss"
-            if data_cfg.metric.name not in MetricStringToTorchMetric:
-                raise KeyError(
-                    f"{data_cfg.metric.name} is not supported. List of supported metrics: {MetricStringToTorchMetric.keys()}"
-                )
-            if data_cfg.metric.name in self._metrics_require_string2category_map:
-                if data_cfg.metric.average is None:
-                    raise ValueError(
-                        f"{data_cfg.metric.name} requires specifying whether you want to compute a micro or macro average. Found None."
+            metrics = []
+            for metric in data_cfg.metrics:
+                if not hasattr(metric, "name"):
+                    raise ValueError("Metric name is not provided in the metric config.")
+                base_metric_name = metric.name.replace("asr-", "")
+                if metric.name == "loss" or metric.name == "mos":
+                    metrics.append((None, metric.name))
+                    continue
+                if base_metric_name not in MetricStringToTorchMetric:
+                    raise KeyError(
+                        f"{metric.name} is not supported. List of supported metrics: {MetricStringToTorchMetric.keys()}"
                     )
-            if (
-                data_cfg.metric.get('labels_are_strings', False)
-                and data_cfg.metric.name in self._metrics_require_string2category_map
-            ):
-                if data_cfg.metric.num_classes is None:
-                    raise ValueError(
-                        "Number of classes is not provided in the metric section within the data config. "
-                        f"Please provide the number of classes in the data config to use the {data_cfg.metric.name} metric."
-                    )
-                if data_cfg.metric.get('class_labels', None) is None or not isinstance(
-                    data_cfg.metric.get('class_labels', None), ListConfig
+                if base_metric_name in self._metrics_require_string2category_map:
+                    if metric.average is None:
+                        raise ValueError(
+                            f"{metric.name} requires specifying whether you want to compute a micro or macro average. Found None."
+                        )
+                if (
+                    metric.get('labels_are_strings', False)
+                    and base_metric_name in self._metrics_require_string2category_map
                 ):
-                    raise ValueError(
-                        "Class labels are not provided properly in the metric section witnin the data config. "
-                        f"Please provide the class labels as a list of strings in the data config to use the {data_cfg.metric.name} metric."
-                    )
-                if len(data_cfg.metric.get('class_labels', None)) != data_cfg.metric.num_classes:
-                    raise ValueError(
-                        f"Number of class labels {len(data_cfg.metric.get('class_labels', None))} does not match `num_classes` : {data_cfg.metric.num_classes}"
-                    )
+                    if metric.num_classes is None:
+                        raise ValueError(
+                            "Number of classes is not provided in the metric section within the data config. "
+                            f"Please provide the number of classes in the data config to use the {metric.name} metric."
+                        )
+                    if metric.get('class_labels', None) is None or not isinstance(
+                        metric.get('class_labels', None), ListConfig
+                    ):
+                        raise ValueError(
+                            "Class labels are not provided properly in the metric section witnin the data config. "
+                            f"Please provide the class labels as a list of strings in the data config to use the {metric.name} metric."
+                        )
+                    if len(metric.get('class_labels', None)) != metric.num_classes:
+                        raise ValueError(
+                            f"Number of class labels {len(metric.get('class_labels', None))} does not match `num_classes` : {metric.num_classes}"
+                        )
 
-            metric_name = data_cfg.metric.name
-            metric_cls = MetricStringToTorchMetric[metric_name]
-            if metric_name not in TextMetricsSet:
-                metric = [metric_cls(**data_cfg.metric)]
-            else:
-                metric = [metric_cls()]
-        return metric, metric_name
+                metric_cls = MetricStringToTorchMetric[base_metric_name]
+                if base_metric_name not in TextMetricsSet:
+                    metric_fn = metric_cls(**data_cfg.metric)
+                else:
+                    metric_fn = metric_cls()
+                metrics.append((metric_fn, metric.name))
+        return zip(*metrics)
 
     # Override the parent batch reconfiguring logic.
     def _reconfigure_and_process_inference_batch(self, batch, data_cfg):
@@ -1059,6 +1059,7 @@ class ModularizedAudioT5Model(MegatronT5LoraModel):
                         _ = metric_fn(pred, label)
 
                     metric_result = metric_fn.compute()
+                    metric_fn.reset()
 
                 if metric_name == 'rouge':
                     for k, v in metric_result.items():
@@ -1070,7 +1071,6 @@ class ModularizedAudioT5Model(MegatronT5LoraModel):
                     self.log(metric_log_key, metric_result.item(), sync_dist=True)
                     logging.info(f"{mode} {metric_name}: {metric_result.item()}")
 
-                metric_fn.reset()
                 averaged_metric.append(metric_result)
 
             # Write predictions to file
@@ -1242,15 +1242,7 @@ class ModularizedAudioT5Model(MegatronT5LoraModel):
         # Function that determines whether to log based on the user provided name of the dataset or the dataloader index.
         base_key = f"{mode}_{metric_name}_" if metric_name is not None else f"{mode}_"
         # If the user provided names for each validation/test dataset, use those.
-        if hasattr(data_config, "names") and data_config.names is not None:
-            # With only a single validation/test dataset, the name is not a list.
-            if not isinstance(data_config.names, ListConfig):
-                name = data_config.names
-            else:
-                name = data_config.names[dataloader_idx]
-            return base_key + name
-        else:
-            return base_key + f"dataloader{dataloader_idx}"
+        return base_key + f"dataloader{dataloader_idx}"
 
     def test_step(self, dataloader_iter, dataloader_idx=0):
         return self.inference_step(dataloader_iter, 'test')
@@ -1457,6 +1449,7 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
             : pretrained_emb.weight.shape[0]
         ] = pretrained_emb.weight.data
         self.word_embeddings = self.frozen_model.enc_dec_model.encoder_embedding.word_embeddings
+        self.additional_models = {}
 
     @classmethod
     def _modify_config(cls, gpt_cfg, cfg, audio_cfg, add_cfg_to_tree=False):
@@ -1811,7 +1804,10 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
         if isinstance(outputs[0], dict):
             outputs = [outputs]
         
+        metric_names = self.val_metric_names if mode == 'validation' else self.test_metric_names
+        metrics = self.val_metrics if mode == 'validation' else self.test_metrics
         averaged_loss = []
+        averaged_metrics = [[] for _ in range(len(metric_names))]
         # Log metrics for each provided validation/test dataset.
         for dataloader_idx, output in enumerate(outputs):
             if len(output) == 0:
@@ -1880,16 +1876,17 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                             text_pred, speech_pred = self.parse_decoder_outputs(pred, self.tokenizer.eos_id, self.cfg.data.train_ds.speech_pad_id, self.cfg.data.train_ds.speech_eos_id)
                             _, speech_answer = self.parse_decoder_outputs(answer, self.tokenizer.eos_id, self.cfg.data.train_ds.speech_pad_id, self.cfg.data.train_ds.speech_eos_id)
                             text_answer = target_text[:, 0]
-                            deduplicated_outputs['text_preds'].append(MegatronT5SFTModel.ids_to_text(text_pred.unsqueeze(0), self.tokenizer))
-                            deduplicated_outputs['text_answers'].append(MegatronT5SFTModel.ids_to_text(text_answer.unsqueeze(0), self.tokenizer))
+                            deduplicated_outputs['text_preds'].append(MegatronT5SFTModel.ids_to_text(text_pred.unsqueeze(0), self.tokenizer)[0])
+                            deduplicated_outputs['text_answers'].append(MegatronT5SFTModel.ids_to_text(text_answer.unsqueeze(0), self.tokenizer)[0])
                             deduplicated_outputs['speech_preds'].append(speech_pred.cpu().numpy())
                             deduplicated_outputs['speech_answers'].append(speech_answer.cpu().numpy())
                             deduplicated_outputs['inputs'].append(input)
                             deduplicated_outputs['self_attn'].append(self_attn.cpu().numpy())
                             deduplicated_outputs['cross_attn'].append(cross_attn.cpu().numpy())
                             deduplicated_outputs['metadata'].append(metadata)
-            # Write predictions to file
-            if self.global_rank == 0 and data_cfg.get("write_predictions_to_file", False):
+
+            # Save numpy files
+            if self.global_rank == 0:
                 logging.info(
                     f"Total deduplicated inference data size: {total_size} to {len(deduplicated_outputs['inputs'])}"
                 )
@@ -1901,20 +1898,108 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                     )
                 filename_log_key = self._determine_log_key(data_cfg, dataloader_idx, None, mode)
                 output_dir = data_cfg.get("output_dir", "./")
-                self.write_predictions_to_file(
+                _, _, pred_npy_paths, answer_npy_paths = self.save_numpy_files(
                     deduplicated_outputs, f"{data_cfg.output_file_path_prefix}_{filename_log_key}", output_dir
                 )
+
+            # Compute metric score
+            for metric_name, metric_fn, averaged_metric in zip(metric_names, metrics, averaged_metrics):
+                if metric_name != 'loss':
+                    metric_log_key = self._determine_log_key(data_cfg, dataloader_idx, metric_name, mode)
+                    labels = deduplicated_outputs['text_answers']
+
+                    if "asr" in metric_name:
+                        if 'asr_model' not in self.additional_models:
+                            import nemo.collections.asr as nemo_asr
+                            asr_model = nemo_asr.models.EncDecHybridRNNTCTCBPEModel.from_pretrained("stt_multilingual_fastconformer_hybrid_large_pc_blend_eu").to(self.device)
+                            asr_model.encoder.disable_torch_distributed = True # For multi-gpu training validation
+                            asr_model.eval()
+                            self.additional_models['asr_model'] = asr_model
+                            logging.info(f"Loaded ASR Model: {asr_model}")
+                        else:
+                            asr_model = self.additional_models['asr_model']
+                        
+                        if 'codec_model' not in self.additional_models:
+                            from nemo.collections.tts.models import AudioCodecModel
+                            codec_model = AudioCodecModel.restore_from(self.cfg.codec_model_path)
+                            codec_model.to(self.device)
+                            codec_model.eval()
+                            self.additional_models['codec_model'] = codec_model
+                            logging.info(f"Loaded Codec Model: {codec_model}")
+                        else:
+                            codec_model = self.additional_models['codec_model']
+                        
+                        logging.info(f"Decoding and saving audio")
+                        pred_wavs = self.decode_and_save_wavs(codec_model, pred_npy_paths, os.path.join(output_dir, "wav", "pred"))
+                        answer_wavs = self.decode_and_save_wavs(codec_model, answer_npy_paths, os.path.join(output_dir, "wav", "answer"))
+                        logging.info(f"Running ASR on speech preds")
+                        speech_preds_transcribed = [asr_model.transcribe(wav)[0][0] for wav in pred_wavs]
+                        deduplicated_outputs['speech_preds_transcribed'] = speech_preds_transcribed
+
+                    # sacrebleu.corpus_bleu is commonly used which does not share
+                    # the same interface as other metrics. We handle it separately.
+                    text_preds = deduplicated_outputs['text_preds']
+                    if "asr-" in metric_name:
+                        text_preds = deduplicated_outputs['speech_preds_transcribed']
+
+                    text_metric_name = metric_name.replace("asr-", "")
+                    if text_metric_name == 'bleu':
+                        metric_result = torch.Tensor(
+                            [sacrebleu.corpus_bleu(text_preds, [labels]).score]
+                        ).to(self.device)
+                    elif metric_name == 'asr-wer':
+                        for pred, label in zip(deduplicated_outputs['speech_preds_transcribed'], deduplicated_outputs['text_preds']):
+                            _ = metric_fn(pred, label)
+
+                        metric_result = metric_fn.compute()
+                    elif metric_name == 'mos':
+                        if 'squim_mos_model' not in self.additional_models:
+                            from torchaudio.pipelines import SQUIM_SUBJECTIVE
+                            squim_mos_model = SQUIM_SUBJECTIVE.get_model().to(self.device)
+                            self.additional_models['squim_mos_model'] = squim_mos_model
+                        else:
+                            squim_mos_model = self.additional_models['squim_mos_model']
+
+                        import torchaudio
+                        pred_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in pred_wavs]
+                        answer_wavs = [torchaudio.functional.resample(wav, 22050, 16000).unsqueeze(0) for wav in answer_wavs]
+                        squim_mos_scores = [squim_mos_model(pred_wav, answer_wav) for pred_wav, answer_wav in zip(pred_wavs, answer_wavs)]
+                        metric_result = sum(squim_mos_scores) / len(squim_mos_scores)
+                    else:
+                        for pred, label in zip(deduplicated_outputs['preds'], labels):
+                            _ = metric_fn(pred, label)
+
+                        metric_result = metric_fn.compute()
+                        metric_fn.reset()
+                        
+                    self.log(metric_log_key, metric_result.item(), sync_dist=True)
+                    logging.info(f"{mode} {metric_name}: {metric_result.item()}")
+
+                    averaged_metric.append(metric_result)
 
             torch.distributed.barrier(group=parallel_state.get_data_parallel_group())
             outputs[dataloader_idx].clear()  # free memory
 
+            # Write predictions to file
+            if self.global_rank == 0 and data_cfg.get("write_predictions_to_file", False):
+                self.write_predictions_to_file(
+                    deduplicated_outputs, f"{data_cfg.output_file_path_prefix}_{filename_log_key}", output_dir
+                )
+
         # Logging of the averaged metrics:
         averaged_loss = sum(averaged_loss) / len(averaged_loss)
+        averaged_metrics = [sum(averaged_metric) / len(averaged_metric) if len(averaged_metric) > 0 else None for averaged_metric in averaged_metrics]
 
         if mode == 'validation':
             self.log("validation_loss", averaged_loss, batch_size=1, sync_dist=True)
+            for metric_name, averaged_metric in zip(metric_names, averaged_metrics):
+                if averaged_metric is not None:
+                    self.log(f"validation_{metric_name}", averaged_metric, sync_dist=True)
         elif mode == 'test':
             self.log("test_loss", averaged_loss, batch_size=1, sync_dist=True)
+            for metric_name, averaged_metric in zip(metric_names, averaged_metrics):
+                if averaged_metric is not None:
+                    self.log(f"test_{metric_name}", averaged_metric, sync_dist=True)
 
         # Merge the functionality of previous on_inference_epoch_end() within inference_epoch_end() func here
         app_state = AppState()
@@ -1938,7 +2023,7 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
                 data_parallel_size=parallel_state.get_data_parallel_world_size(),
             )
 
-        return averaged_loss, averaged_loss
+        return averaged_loss, averaged_metrics
     
     def parse_decoder_outputs(self, decoder_output, text_separator, speech_pad_id=1001, speech_eos_id=1004):
         # Split text and speech part based on the position of the first separator token
@@ -1963,8 +2048,7 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
         speech_tokens = speech_tokens.reshape(new_shape)
         return text_tokens, speech_tokens
 
-    # consistent with speech models
-    def write_predictions_to_file(self, outputs, output_file_path_prefix, output_dir):
+    def save_numpy_files(self, outputs, output_file_path_prefix, output_dir):
         inputs_path = os.path.join(output_dir, output_file_path_prefix + "_inputs.jsonl")
         for folder_name in ['speech_pred', 'speech_answer', 'speaker_contexts', 'self_attn', 'cross_attn']:
             os.makedirs(os.path.join(output_dir, 'npy', folder_name), exist_ok=True)
@@ -1973,24 +2057,53 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
         speech_pred_path = os.path.join(output_dir, 'npy', 'speech_pred', output_file_path_prefix + "_speech_pred_{}.npy")
         speech_answer_path = os.path.join(output_dir, 'npy', 'speech_answer', output_file_path_prefix + "_speech_answer_{}.npy")
 
+        save_paths = []
         with open(inputs_path, "w") as f_json:
             assert (
-                len(outputs['inputs']) == len(outputs['text_preds']) == len(outputs['text_answers']) == len(outputs['speech_preds']) == len(outputs['speech_answers']) == len(outputs['self_attn']) == len(outputs['cross_attn']) == len(outputs['metadata'])
+                len(outputs['inputs']) == len(outputs['speech_preds']) == len(outputs['speech_answers']) == len(outputs['self_attn']) == len(outputs['cross_attn'])
             )
-            for i, (input_, text_pred, text_answer, speech_pred, speech_answer, self_attn, cross_attn, md) in enumerate(zip(outputs['inputs'], outputs['text_preds'], outputs['text_answers'], outputs['speech_preds'], outputs['speech_answers'], outputs['self_attn'], outputs['cross_attn'], outputs['metadata'])):
-                json_string = {"index": i, 'preds': text_pred, 'answers': text_answer}
+            for i, (speech_pred, speech_answer, self_attn, cross_attn) in enumerate(zip(outputs['speech_preds'], outputs['speech_answers'], outputs['self_attn'], outputs['cross_attn'])):
+                np.save(self_attn_path.format(i), self_attn)
+                np.save(cross_attn_path.format(i), cross_attn)
+                np.save(speech_pred_path.format(i), speech_pred)
+                np.save(speech_answer_path.format(i), speech_answer)
+                save_paths.append((self_attn_path.format(i), cross_attn_path.format(i), speech_pred_path.format(i), speech_answer_path.format(i)))
+        
+        return zip(*save_paths)
+
+    # consistent with speech models
+    def write_predictions_to_file(self, outputs, output_file_path_prefix, output_dir):
+        inputs_path = os.path.join(output_dir, output_file_path_prefix + "_inputs.jsonl")
+
+        with open(inputs_path, "w") as f_json:
+            assert (
+                len(outputs['inputs']) == len(outputs['text_preds']) == len(outputs['text_answers']) == len(outputs['speech_preds_transcribed']) == len(outputs['metadata'])
+            )
+            for i, (input_, text_pred, text_answer, speech_pred_transcribed, md) in enumerate(zip(outputs['inputs'], outputs['text_preds'], outputs['text_answers'], outputs['speech_preds_transcribed'], outputs['metadata'])):
+                json_string = {"index": i, 'preds': text_pred, 'preds_speech': speech_pred_transcribed, 'answers': text_answer}
                 for k, v in md.items():
                     if k not in json_string:
                         json_string[k] = v
                 f_json.write(json.dumps(json_string) + '\n')
 
-                # np.save(speaker_contexts_path.format(i), speaker_context.cpu().numpy())
-                np.save(self_attn_path.format(i), self_attn)
-                np.save(cross_attn_path.format(i), cross_attn)
-                np.save(speech_pred_path.format(i), speech_pred)
-                np.save(speech_answer_path.format(i), speech_answer)
-
         logging.info(f'Predictions saved to {output_dir}')
+    
+    def decode_and_save_wavs(self, codec_model, npy_files, wav_dir):
+        import soundfile as sf
+
+        sample_rate = 22050
+        os.makedirs(wav_dir, exist_ok=True)
+        wavs = []
+        for npy_file in npy_files:
+            codes = np.load(npy_file)
+            codes = torch.tensor(codes).to(codec_model.device).T
+            codec_len = torch.Tensor([codes.shape[1]]).long().to(codec_model.device)
+            wav, _ = codec_model.decode(tokens=codes.unsqueeze(0), tokens_len=codec_len)
+            wav = wav[0]
+            wavs.append(wav)
+            sf.write(os.path.join(wav_dir, os.path.basename(npy_file).replace(".npy", ".wav")), wav.detach().cpu().numpy(), sample_rate)
+
+        return wavs
 
     def _build_dataset(self, data_cfg, is_train=True):
         # this is crucial so as to tell the decoder when to start generate answer after context and paddings
