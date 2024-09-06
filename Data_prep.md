@@ -25,7 +25,7 @@ python scripts/add_codec_path.py --input_manifest /workspace/data/s2s/{es,fr,de}
 
 The modified manifest file will be saved at ``/workspace/data/s2s/{es,fr,de}/manifest_{es,fr,de}_to_rodney_no_emotion_context_Rodney_44khz_WIZWIKI_RODNEY_WIZWIKI_005619_s2s_codec.json``.
 
-## Running ASR forced-alignment to filter out low-quality synthetic data
+## Running ASR forced-alignment to filter out low-quality synthetic data (this step is optional)
 Sometimes, synthetic data does not follow the transcription perfectly.
 To filter out low-quality synthetic data, we use [wav2vec2 forced alignment tool](https://pytorch.org/audio/stable/tutorials/forced_alignment_tutorial.html) to score the alignment between the text transcript and synthetic speech.
 Run
