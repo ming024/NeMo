@@ -21,7 +21,6 @@ TOTAL_NUM_GPUS=`expr $GPUS_PER_NODE \* $SLURM_JOB_NUM_NODES`
 SLURM_ACCOUNT=portfolios/llmservice		# <Make sure you dont override SLURM_ACCOUNT!>
 USERID=users/chchien
 LUSTRE_ACCOUNT_PREFIX=/lustre/fsw/${SLURM_ACCOUNT}  
-WANDB='c9720a177e0925df6cf105411f60fcabbaa9786a'
 
 TRAIN_MAX_DURATION=40
 MAX_OPEN_FDS=null
