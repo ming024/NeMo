@@ -2046,6 +2046,11 @@ class MultiProjModularizedAudioT5Model(ModularizedAudioT5Model):
         else:
             text_tokens = decoder_output[:, 0]
             speech_tokens = decoder_output[:, 1:]
+        
+        # Set speech tokens to zero tensor to avoid codec model decoding error
+        if speech_tokens.shape[0] < 80:
+            # Speech tokens are obvious too short (which happens a lot a the beginning of training)
+            speech_tokens = torch.zeros((100, speech_tokens.shape[1]), dtype=speech_tokens.dtype).to(speech_tokens.device)
 
         # Get speech token ids
         n_speech_codebooks = self.frozen_model.n_proj_heads-1
